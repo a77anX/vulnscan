@@ -1,0 +1,21 @@
+# virtual environment (lives inside the project folder)
+Include/
+Lib/
+Scripts/
+pyvenv.cfg
+.venv/
+venv/
+
+# python
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+
+# scan output - may contain findings about real systems
+*.sarif
+*-report.md
+report.md
+results.*
