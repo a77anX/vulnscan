@@ -1,0 +1,16 @@
+[project]
+name = "vulnscan"
+version = "0.1.0"
+description = "Modular vulnerability scanner framework: web (DAST) + code (SAST)"
+requires-python = ">=3.9"
+dependencies = ["requests>=2.28"]
+
+[project.scripts]
+vulnscan = "vulnscan.cli:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["vulnscan*"]
