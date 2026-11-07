@@ -15,16 +15,34 @@ def _finish(findings):
     return sorted(uniq.values(), key=lambda f: (-int(f.severity), f.rule_id, f.location, f.line or 0))
 
 
-def scan_web(url, *, active=False, max_pages=30, delay=0.2, verify=True, headers=None):
-    crawler = Crawler(url, max_pages, delay, verify=verify, headers=headers)
-    pages = crawler.crawl()
+def scan_web(url, *, active=False, blind_sqli=False, render_js=False, max_pages=30, delay=0.2,
+            verify=True, headers=None, scope=None):
+    if render_js:
+        from .web.jscrawler import JSCrawler
+        from .web.crawler import WebContext
+        import requests
+        jc = JSCrawler(url, max_pages, delay, headers=headers, scope=scope)
+        pages = jc.crawl()
+        # Active/blind-SQLi probes still use the fast requests-based context, not the browser.
+        ctx = WebContext(requests.Session(), 10, verify, delay, scope=scope)
+        ctx.session.headers["User-Agent"] = "vulnscan/0.1 (authorized-testing)"
+        if headers:
+            ctx.session.headers.update(headers)
+    else:
+        crawler = Crawler(url, max_pages, delay, verify=verify, headers=headers, scope=scope)
+        pages = crawler.crawl()
+        ctx = crawler.ctx
+
     out = []
     for pg in pages:
         for chk in registry.WEB_PASSIVE:
-            out.extend(chk(pg, crawler.ctx))
+            out.extend(chk(pg, ctx))
     if active:
         for chk in registry.WEB_ACTIVE:
-            out.extend(chk(pages, crawler.ctx))
+            out.extend(chk(pages, ctx))
+        if blind_sqli:
+            for chk in registry.WEB_TIME:
+                out.extend(chk(pages, ctx))
     return _finish(out), len(pages)
 
 

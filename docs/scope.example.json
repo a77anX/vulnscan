@@ -1,0 +1,7 @@
+{
+  "client": "Acme Corp",
+  "authorized_by": "Jane Dela Cruz, CTO",
+  "date_authorized": "2026-11-01",
+  "targets": ["https://staging.acme.example.com"],
+  "excluded_paths": ["/admin/delete-account", "/api/payments"]
+}

@@ -1,4 +1,5 @@
 from __future__ import annotations
+import sys
 import time
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
@@ -37,8 +38,15 @@ class WebContext:
     timeout: float = 10
     verify: bool = True
     delay: float = 0.2
+    scope: object = None  # vulnscan.scope.Scope, or None for unrestricted (dev/lab use)
 
     def request(self, method, url, params, allow_redirects=True):
+        if self.scope is not None:
+            try:
+                self.scope.check(url)
+            except Exception as e:
+                print(f"[scope] {e}", file=sys.stderr)
+                return None
         time.sleep(self.delay)
         try:
             if method == "post":
@@ -72,20 +80,28 @@ class _Extractor(HTMLParser):
 
 
 class Crawler:
-    """Same-origin breadth-first crawler with a hard page cap and request delay."""
+    """Same-origin breadth-first crawler with a hard page cap and request delay.
 
-    def __init__(self, start, max_pages=30, delay=0.2, timeout=10, verify=True, headers=None):
-        self.start, self.max_pages = start, max_pages
+    If `scope` is given (a vulnscan.scope.Scope), the crawler stays within its listed target
+    hosts instead of just the host of `start`, and every fetch is also checked against its
+    excluded_paths before being sent."""
+
+    def __init__(self, start, max_pages=30, delay=0.2, timeout=10, verify=True, headers=None,
+                scope=None):
+        self.start, self.max_pages, self.scope = start, max_pages, scope
         self.host = urlparse(start).netloc
-        self.ctx = WebContext(requests.Session(), timeout, verify, delay)
+        self.ctx = WebContext(requests.Session(), timeout, verify, delay, scope=scope)
         self.ctx.session.headers["User-Agent"] = "vulnscan/0.1 (authorized-testing)"
         if headers:
             self.ctx.session.headers.update(headers)
 
     def _in_scope(self, url):
         p = urlparse(url)
-        return p.scheme in ("http", "https") and p.netloc == self.host \
-            and not p.path.lower().endswith(SKIP_EXT)
+        if p.scheme not in ("http", "https") or p.path.lower().endswith(SKIP_EXT):
+            return False
+        if self.scope is not None:
+            return any(urlparse(t).netloc == p.netloc for t in self.scope.targets)
+        return p.netloc == self.host
 
     def crawl(self):
         queue, seen, pages = [self.start], set(), []
@@ -94,6 +110,12 @@ class Crawler:
             if url in seen or not self._in_scope(url):
                 continue
             seen.add(url)
+            if self.scope is not None:
+                try:
+                    self.scope.check(url)
+                except Exception as e:
+                    print(f"[scope] {e}", file=sys.stderr)
+                    continue
             try:
                 time.sleep(self.ctx.delay)
                 r = self.ctx.session.get(url, timeout=self.ctx.timeout, verify=self.ctx.verify)

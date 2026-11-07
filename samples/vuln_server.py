@@ -1,10 +1,15 @@
 """Deliberately vulnerable local lab target (127.0.0.1 only). DO NOT expose."""
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse, parse_qs
 
 HOME = b"""<html><body><h1>Lab</h1>
 <a href="/search?q=test">search</a> <a href="/item?id=1">item</a> <a href="/go?next=/">go</a>
+<a href="/timesqli?q=test">timesqli</a>
 <form method="post" action="/login"><input name="user"><input type="password" name="pw"></form>
+<form method="post" action="/transfer">
+  <input name="to_account"><input name="amount"><input type="hidden" name="csrf_token" value="fixed-token-not-checked">
+</form>
 </body></html>"""
 
 
@@ -33,11 +38,25 @@ class H(BaseHTTPRequestHandler):
                 self._send(f"<html>Item {v}</html>")
         elif u.path == "/go":
             self._send(b"", 302, {"Location": q.get("next", "/")})
+        elif u.path == "/timesqli":
+            # Deliberately vulnerable: simulates a backend that passes `q` straight into a SQL
+            # string, so a SLEEP()-style payload actually delays the response -- with no error
+            # message and no visible change in the page, exactly what WEB-SQLI-002 must catch
+            # without the error-based check's help.
+            v = q.get("q", "")
+            if "sleep(" in v.lower():
+                time.sleep(2)
+            self._send(f"<html>Results for {v}</html>")
         else:
             self._send(HOME)
 
     def do_POST(self):
-        self._send("<html>nope</html>")
+        # Deliberately vulnerable: /transfer "validates" nothing -- any token, or none, is accepted,
+        # and Origin/Referer are never checked. This is what WEB-CSRF-001 should catch.
+        if self.path == "/transfer":
+            self._send("<html>Transfer OK</html>")
+        else:
+            self._send("<html>nope</html>")
 
     def log_message(self, *a):
         pass

@@ -97,8 +97,4 @@ def form_checks(page, ctx):
             yield _w("WEB-FRM-001", "Password form submits over HTTP", S.HIGH, f.action,
                      "Credentials sent in cleartext.", "Serve and submit over HTTPS.",
                      "CWE-319", "A02:2021", f.action)
-        if f.method == "post" and not any(re.search(r"csrf|xsrf|token|authenticity", n, re.I)
-                                          for n in f.inputs):
-            yield _w("WEB-FRM-002", "POST form without apparent CSRF token (heuristic)", S.MEDIUM,
-                     f.action, "State-changing form may be CSRF-able.",
-                     "Add anti-CSRF tokens / SameSite cookies.", "CWE-352", "A01:2021", f.action)
+        # CSRF is now tested behaviourally in active.py (WEB-CSRF-001), not guessed here.

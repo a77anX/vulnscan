@@ -2,9 +2,10 @@
 
 web_passive : fn(page, ctx)  -> Iterable[Finding]   (analyses crawled responses only)
 web_active  : fn(pages, ctx) -> Iterable[Finding]   (sends test payloads; opt-in)
+web_time    : fn(pages, ctx) -> Iterable[Finding]   (timing-based probes; slower, opt-in)
 code_check  : fn(path, text) -> Iterable[Finding]   (static analysis of one file)
 """
-WEB_PASSIVE, WEB_ACTIVE, CODE_CHECKS = [], [], []
+WEB_PASSIVE, WEB_ACTIVE, WEB_TIME, CODE_CHECKS = [], [], [], []
 
 
 def web_passive(fn):
@@ -14,6 +15,11 @@ def web_passive(fn):
 
 def web_active(fn):
     WEB_ACTIVE.append(fn)
+    return fn
+
+
+def web_time(fn):
+    WEB_TIME.append(fn)
     return fn
 
 
